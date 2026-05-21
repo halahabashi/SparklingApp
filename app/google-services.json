@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "943023929688",
+    "project_id": "floginsignup-dfb68",
+    "storage_bucket": "floginsignup-dfb68.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:943023929688:android:aea8eff940174beb8acd2d",
+        "android_client_info": {
+          "package_name": "com.example.floginsignup"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAr0H2O3CXVsMxo6yCFlGgGAyiHq22TK7E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

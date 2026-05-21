@@ -1,0 +1,82 @@
+<resources>
+    <string name="app_name">Smart Parking</string>
+
+    <string name="login_title">Welcome back</string>
+    <string name="login_subtitle">Sign in to your account</string>
+    <string name="signup_title">Create account</string>
+    <string name="signup_subtitle">Get started in seconds</string>
+    <string name="forgot_title">Reset password</string>
+    <string name="forgot_subtitle">We\'ll email you a reset link</string>
+
+    <string name="email_hint">Email</string>
+    <string name="password_hint">Password</string>
+
+    <string name="signup_button">Sign up</string>
+    <string name="reset_button">Send reset link</string>
+
+    <string name="forgot_link">Forgot password?</string>
+    <string name="no_account_prompt">Don\'t have an account?</string>
+    <string name="signup_link">Sign up</string>
+    <string name="have_account_prompt">Already have an account?</string>
+    <string name="login_link">Log in</string>
+
+    <string name="welcome_title">Welcome to Smart Parking</string>
+    <string name="welcome_subtitle">Where we make finding and paying for parking effortless.</string>
+    <string name="get_started_button">Get started</string>
+    <string name="login_as_admin">Login as Admin</string>
+    <string name="login_as_client">Login as Client</string>
+    <string name="logout_button">Log out</string>
+
+    <!-- Home / dashboard -->
+    <string name="greeting_morning">Good morning</string>
+    <string name="dashboard_title">Dashboard</string>
+    <string name="stat_total">Total Spots</string>
+    <string name="stat_occupied">Occupied</string>
+    <string name="stat_available">Available</string>
+    <string name="stat_revenue">Revenue</string>
+    <string name="stat_spent">You Spent</string>
+    <string name="parking_overview">Parking Overview</string>
+    <string name="recent_activity">Recent Activity</string>
+    <string name="view_all">View all</string>
+    <string name="legend_occupied">Occupied (%1$d)</string>
+    <string name="legend_reserved">Reserved (%1$d)</string>
+    <string name="legend_free">Free (%1$d)</string>
+
+    <!-- Parking -->
+    <string name="parking_title">Parking Spots</string>
+    <string name="gate_open">Gate Open</string>
+    <string name="gate_closed_chip">Gate Closed</string>
+    <string name="gate_status_open">Gate: Open</string>
+    <string name="entry_count">Entry: %1$d</string>
+    <string name="exit_count">Exit: %1$d</string>
+    <string name="driving_lane">DRIVING LANE</string>
+    <string name="gate_closed">Gate: Closed</string>
+    <string name="auto_close_enabled">Auto-close enabled</string>
+    <string name="occupancy">Occupancy</string>
+    <string name="occupancy_percent">%1$d%%</string>
+    <string name="occupancy_label">occupied</string>
+    <string name="occupancy_legend_occupied">Occupied · %1$d</string>
+    <string name="occupancy_legend_available">Available · %1$d</string>
+    <string name="occupancy_legend_reserved">Reserved · %1$d</string>
+    <string name="open_gate">Open Gate</string>
+    <string name="gate_open_countdown">Open · %1$ds</string>
+
+    <!-- Activity -->
+    <string name="activity_title">Activity Log</string>
+    <string name="filter">Filter</string>
+    <string name="today">Today</string>
+    <string name="time_minutes_ago">%1$d minutes ago</string>
+    <string name="time_minute_ago">%1$d minute ago</string>
+    <string name="time_hour_ago">%1$d hour ago</string>
+    <string name="time_hours_ago">%1$d hours ago</string>
+    <string name="time_just_now">Just now</string>
+
+    <!-- Profile -->
+    <string name="profile_title">Profile</string>
+
+    <!-- Bottom nav -->
+    <string name="nav_home">HOME</string>
+    <string name="nav_parking">PARKING</string>
+    <string name="nav_activity">ACTIVITY</string>
+    <string name="nav_profile">PROFILE</string>
+</resources>
