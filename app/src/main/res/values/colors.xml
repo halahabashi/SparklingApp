@@ -25,4 +25,7 @@
     <color name="text_muted">#94A3B8</color>
     <color name="divider">#E2E8F0</color>
     <color name="spot_outline">#334155</color>
+
+    <color name="colorOff">#000000</color>
+    <color name="colorOn">#FF8800</color>
 </resources>
