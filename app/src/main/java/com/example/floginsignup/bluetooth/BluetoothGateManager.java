@@ -31,10 +31,12 @@ public class BluetoothGateManager {
     public static final String CMD_CLOSE_GATE = "C";
 
     public interface Listener {
-        void onConnected(String deviceName);
-        void onConnectionFailed(String reason);
-        void onDisconnected();
-        void onMessage(String message);
+        default void onConnected(String deviceName) {}
+        default void onConnectionFailed(String reason) {}
+        default void onDisconnected() {}
+        default void onMessage(String message) {}
+        /** Fired for every parsed "HALA|..." status line from the ESP32. */
+        default void onStatus(HalaStatus status) {}
     }
 
     private static BluetoothGateManager instance;
@@ -52,12 +54,17 @@ public class BluetoothGateManager {
     private Thread readThread;
     private volatile boolean connected = false;
     private String deviceName;
-    private Listener listener;
+    private final java.util.List<Listener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private volatile HalaStatus lastStatus;
 
     private BluetoothGateManager() {}
 
-    public void setListener(Listener listener) {
-        this.listener = listener;
+    public void addListener(Listener listener) {
+        if (listener != null && !listeners.contains(listener)) listeners.add(listener);
+    }
+
+    public void removeListener(Listener listener) {
+        listeners.remove(listener);
     }
 
     public boolean isConnected() {
@@ -66,6 +73,11 @@ public class BluetoothGateManager {
 
     public String getDeviceName() {
         return deviceName;
+    }
+
+    /** Latest parsed status from the ESP32, or null if none received yet. */
+    public HalaStatus getLastStatus() {
+        return lastStatus;
     }
 
     /**
@@ -82,7 +94,12 @@ public class BluetoothGateManager {
                     notifyFailed("Bluetooth not available on this device");
                     return;
                 }
-                adapter.cancelDiscovery();
+                try {
+                    // Speeds up the connection but needs BLUETOOTH_SCAN, which
+                    // the app doesn't request — skip it if not allowed
+                    adapter.cancelDiscovery();
+                } catch (SecurityException ignored) {
+                }
                 BluetoothDevice device = adapter.getRemoteDevice(address);
                 BluetoothSocket s = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID);
                 s.connect();
@@ -94,7 +111,7 @@ public class BluetoothGateManager {
                 startReadLoop(s.getInputStream());
 
                 mainHandler.post(() -> {
-                    if (listener != null) listener.onConnected(name);
+                    for (Listener l : listeners) l.onConnected(name);
                 });
             } catch (IOException | SecurityException e) {
                 Log.e(TAG, "Failed to connect to " + name, e);
@@ -143,8 +160,13 @@ public class BluetoothGateManager {
                         line.setLength(0);
                         if (!msg.isEmpty()) {
                             Log.d(TAG, "Received: " + msg);
+                            HalaStatus status = HalaStatus.parse(msg);
+                            if (status != null) lastStatus = status;
                             mainHandler.post(() -> {
-                                if (listener != null) listener.onMessage(msg);
+                                for (Listener l : listeners) {
+                                    l.onMessage(msg);
+                                    if (status != null) l.onStatus(status);
+                                }
                             });
                         }
                     } else {
@@ -162,9 +184,10 @@ public class BluetoothGateManager {
     private void handleDisconnect() {
         boolean wasConnected = connected;
         closeSocketQuietly();
+        lastStatus = null;
         if (wasConnected) {
             mainHandler.post(() -> {
-                if (listener != null) listener.onDisconnected();
+                for (Listener l : listeners) l.onDisconnected();
             });
         }
     }
@@ -183,7 +206,7 @@ public class BluetoothGateManager {
 
     private void notifyFailed(String reason) {
         mainHandler.post(() -> {
-            if (listener != null) listener.onConnectionFailed(reason);
+            for (Listener l : listeners) l.onConnectionFailed(reason);
         });
     }
 }

@@ -18,6 +18,8 @@ import com.example.floginsignup.R;
 import com.example.floginsignup.Session;
 import com.example.floginsignup.api.ApiCallback;
 import com.example.floginsignup.api.ApiClient;
+import com.example.floginsignup.bluetooth.BluetoothGateManager;
+import com.example.floginsignup.bluetooth.HalaStatus;
 import com.example.floginsignup.model.ActivityItem;
 import com.example.floginsignup.model.DashboardData;
 import com.example.floginsignup.ui.util.ActivityIcons;
@@ -37,6 +39,14 @@ public class DashboardFragment extends Fragment {
     private View recentActivityCard;
 
     private final Session.Listener sessionListener = this::onSessionChanged;
+
+    private final BluetoothGateManager gateBt = BluetoothGateManager.getInstance();
+    private final BluetoothGateManager.Listener btListener = new BluetoothGateManager.Listener() {
+        @Override
+        public void onStatus(HalaStatus status) {
+            if (isAdded()) applyLiveStats(status);
+        }
+    };
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -64,7 +74,14 @@ public class DashboardFragment extends Fragment {
         view.findViewById(R.id.tvViewAllActivity).setOnClickListener(v -> openTab(2));
 
         tvGreeting.setText(greetingForTime());
+        gateBt.addListener(btListener);
         loadData();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        gateBt.removeListener(btListener);
     }
 
     @Override
@@ -110,6 +127,24 @@ public class DashboardFragment extends Fragment {
         });
     }
 
+    // Live ESP32 data overrides the mock spot statistics
+    private void applyLiveStats(HalaStatus st) {
+        int occ = st.occupiedSpots();
+        int avl = st.availableSpots;
+        tvTotal.setText(String.valueOf(st.totalSpots));
+        tvOccupied.setText(String.valueOf(occ));
+        tvAvailable.setText(String.valueOf(avl));
+
+        tvLegendOccupied.setText(getString(R.string.legend_occupied, occ));
+        tvLegendReserved.setText(getString(R.string.legend_reserved, 0));
+        tvLegendFree.setText(getString(R.string.legend_free, avl));
+
+        stackedBar.setData(
+                new float[]{occ, 0, avl},
+                new int[]{Color.parseColor("#EF4444"), Color.parseColor("#F59E0B"), Color.parseColor("#22C55E")}
+        );
+    }
+
     private void bind(DashboardData d) {
         if (!isAdded()) return;
         tvTotal.setText(String.valueOf(d.totalSpots));
@@ -138,6 +173,10 @@ public class DashboardFragment extends Fragment {
             bindActivityRow(row, item);
             recentActivityContainer.addView(row);
         }
+
+        // If the gate controller is connected, its data wins over the mock
+        HalaStatus live = gateBt.getLastStatus();
+        if (live != null) applyLiveStats(live);
     }
 
     private void bindActivityRow(View row, ActivityItem item) {

@@ -30,7 +30,10 @@ import com.example.floginsignup.api.ApiCallback;
 import com.example.floginsignup.api.ApiClient;
 import com.example.floginsignup.api.ParkingApi;
 import com.example.floginsignup.bluetooth.BluetoothGateManager;
+import com.example.floginsignup.bluetooth.HalaStatus;
 import com.example.floginsignup.bluetooth.SelectDeviceActivity;
+
+import java.util.Arrays;
 import com.example.floginsignup.model.ParkingRow;
 import com.example.floginsignup.model.ParkingSpot;
 import com.example.floginsignup.model.ParkingState;
@@ -54,6 +57,48 @@ public class ParkingFragment extends Fragment {
     private boolean gateBusy = false;
 
     private final BluetoothGateManager gateBt = BluetoothGateManager.getInstance();
+
+    private final BluetoothGateManager.Listener btListener = new BluetoothGateManager.Listener() {
+        @Override
+        public void onConnected(String deviceName) {
+            if (!isAdded()) return;
+            toast(getString(R.string.bt_connected, deviceName));
+            // Device picked from the gate button flow — send the command now
+            sendOpenGate();
+        }
+
+        @Override
+        public void onConnectionFailed(String reason) {
+            if (!isAdded()) return;
+            toast(getString(R.string.bt_connection_failed, reason));
+            resetGateButton();
+        }
+
+        @Override
+        public void onDisconnected() {
+            if (!isAdded()) return;
+            toast(getString(R.string.bt_disconnected));
+        }
+
+        @Override
+        public void onMessage(String message) {
+            if (!isAdded()) return;
+            // ESP32 confirms the real gate state — mirror it in the UI
+            if (message.equalsIgnoreCase("GATE:OPEN")) {
+                applyGateState(true);
+            } else if (message.equalsIgnoreCase("GATE:CLOSED")) {
+                applyGateState(false);
+                // ESP32 closed the gate on its own — stop the countdown
+                if (gateBusy) resetGateButton();
+            }
+        }
+
+        @Override
+        public void onStatus(HalaStatus status) {
+            if (!isAdded()) return;
+            bindLive(status);
+        }
+    };
 
     private final ActivityResultLauncher<String> btPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
@@ -106,39 +151,7 @@ public class ParkingFragment extends Fragment {
         tvBtnGate = v.findViewById(R.id.tvBtnGate);
         btnGate.setOnClickListener(view -> onGateClicked());
 
-        gateBt.setListener(new BluetoothGateManager.Listener() {
-            @Override
-            public void onConnected(String deviceName) {
-                if (!isAdded()) return;
-                toast(getString(R.string.bt_connected, deviceName));
-                // Device picked from the gate button flow — send the command now
-                sendOpenGate();
-            }
-
-            @Override
-            public void onConnectionFailed(String reason) {
-                if (!isAdded()) return;
-                toast(getString(R.string.bt_connection_failed, reason));
-                resetGateButton();
-            }
-
-            @Override
-            public void onDisconnected() {
-                if (!isAdded()) return;
-                toast(getString(R.string.bt_disconnected));
-            }
-
-            @Override
-            public void onMessage(String message) {
-                if (!isAdded()) return;
-                // ESP32 confirms the real gate state — mirror it in the UI
-                if (message.equalsIgnoreCase("GATE:OPEN") || message.contains("G:1")) {
-                    applyGateState(true);
-                } else if (message.equalsIgnoreCase("GATE:CLOSED") || message.contains("G:0")) {
-                    applyGateState(false);
-                }
-            }
-        });
+        gateBt.addListener(btListener);
 
         ApiClient.get().getParkingState(new ApiCallback<ParkingState>() {
             @Override public void onSuccess(ParkingState data) { bind(data); }
@@ -150,7 +163,7 @@ public class ParkingFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         gateHandler.removeCallbacksAndMessages(null);
-        gateBt.setListener(null);
+        gateBt.removeListener(btListener);
     }
 
     private void onGateClicked() {
@@ -262,8 +275,57 @@ public class ParkingFragment extends Fragment {
         tvBtnGate.setText(R.string.open_gate);
     }
 
+    // Live data from the ESP32 — overrides whatever the mock API showed
+    private void bindLive(HalaStatus st) {
+        applyGateState(st.gateOpen);
+
+        int occ = st.occupiedSpots();
+        int avl = st.availableSpots;
+        int total = Math.max(1, st.totalSpots);
+        int pct = Math.round(occ * 100f / total);
+
+        tvOccCount.setText(occ + " Occ");
+        tvAvlCount.setText(avl + " Avl");
+        tvOccPctSmall.setText(pct + "%");
+
+        donut.setData(
+                new float[]{occ, avl, 0},
+                new int[]{Color.parseColor("#EF4444"), Color.parseColor("#22C55E"), Color.parseColor("#F59E0B")}
+        );
+        tvOccPercent.setText(pct + "%");
+        tvDonutOccupied.setText(getString(R.string.occupancy_legend_occupied, occ));
+        tvDonutAvailable.setText(getString(R.string.occupancy_legend_available, avl));
+        tvDonutReserved.setText(getString(R.string.occupancy_legend_reserved, 0));
+
+        // Per-spot data: spots 1-2 -> Row A, spots 3-4 -> Row B
+        if (st.spotOccupied != null && st.spotOccupied.length >= 4) {
+            rowAContainer.removeAllViews();
+            rowBContainer.removeAllViews();
+            populateRow(rowAContainer, Arrays.asList(
+                    liveSpot("A1", st.spotOccupied[0]),
+                    liveSpot("A2", st.spotOccupied[1])));
+            populateRow(rowBContainer, Arrays.asList(
+                    liveSpot("B1", st.spotOccupied[2]),
+                    liveSpot("B2", st.spotOccupied[3])));
+        }
+    }
+
+    private ParkingSpot liveSpot(String id, boolean occupied) {
+        return new ParkingSpot(id, id.substring(0, 1),
+                occupied ? ParkingSpot.Status.OCCUPIED : ParkingSpot.Status.FREE,
+                Color.parseColor("#3B82F6"));
+    }
+
     private void bind(ParkingState s) {
         if (!isAdded()) return;
+        // Connected to the real gate: ignore the mock and show ESP32 data
+        HalaStatus live = gateBt.getLastStatus();
+        if (live != null) {
+            bindLive(live);
+            tvEntry.setText(getString(R.string.entry_count, s.entryCount));
+            tvExit.setText(getString(R.string.exit_count, s.exitCount));
+            return;
+        }
         applyGateState(s.gateOpen);
         if (s.gateOpen && s.gateRemainingMs > 0L && !gateBusy) {
             startGateCountdown(s.gateRemainingMs);
