@@ -16,6 +16,9 @@
             android:name=".bluetooth.MainActivity2"
             android:exported="false" />
         <activity
+            android:name=".bluetooth.SelectDeviceActivity"
+            android:exported="false" />
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>

@@ -52,6 +52,11 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
         itemHolder.linearLayout.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                // Gate flow: return the device to whoever asked for it
+                if (context instanceof SelectDeviceActivity
+                        && ((SelectDeviceActivity) context).returnDeviceToCaller(deviceInfoModel)) {
+                    return;
+                }
                 Intent intent = new Intent(context,MainActivity2.class);
                 // Send device details to the MainActivity
                 intent.putExtra("deviceName", deviceInfoModel.getDeviceName());

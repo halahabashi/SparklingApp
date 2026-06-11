@@ -22,8 +22,25 @@ import java.util.Set;
 
 public class SelectDeviceActivity extends AppCompatActivity {
 
+    public static final String EXTRA_DEVICE_NAME = "deviceName";
+    public static final String EXTRA_DEVICE_ADDRESS = "deviceAddress";
 
     private final int REQUEST_PERMISSION_CONNECT_BLUETOOTH = 1;
+
+    /**
+     * Called by DeviceListAdapter when the user taps a device.
+     * If this activity was started for a result (gate flow), hand the device
+     * back to the caller; otherwise fall through to the standalone demo screen.
+     */
+    public boolean returnDeviceToCaller(DeviceInfoModel device) {
+        if (getCallingActivity() == null) return false;
+        android.content.Intent result = new android.content.Intent();
+        result.putExtra(EXTRA_DEVICE_NAME, device.getDeviceName());
+        result.putExtra(EXTRA_DEVICE_ADDRESS, device.getDeviceHardwareAddress());
+        setResult(RESULT_OK, result);
+        finish();
+        return true;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

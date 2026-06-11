@@ -61,6 +61,13 @@
     <string name="open_gate">Open Gate</string>
     <string name="gate_open_countdown">Open · %1$ds</string>
 
+    <!-- Bluetooth gate -->
+    <string name="bt_permission_needed">Bluetooth permission is needed to open the gate</string>
+    <string name="bt_connecting">Connecting to %1$s…</string>
+    <string name="bt_connected">Connected to %1$s</string>
+    <string name="bt_connection_failed">Gate connection failed: %1$s</string>
+    <string name="bt_disconnected">Gate Bluetooth disconnected</string>
+
     <!-- Activity -->
     <string name="activity_title">Activity Log</string>
     <string name="filter">Filter</string>

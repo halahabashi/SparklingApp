@@ -1,6 +1,9 @@
 package com.example.floginsignup.ui;
 
+import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.os.Bundle;
@@ -14,7 +17,10 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
@@ -23,6 +29,8 @@ import com.example.floginsignup.R;
 import com.example.floginsignup.api.ApiCallback;
 import com.example.floginsignup.api.ApiClient;
 import com.example.floginsignup.api.ParkingApi;
+import com.example.floginsignup.bluetooth.BluetoothGateManager;
+import com.example.floginsignup.bluetooth.SelectDeviceActivity;
 import com.example.floginsignup.model.ParkingRow;
 import com.example.floginsignup.model.ParkingSpot;
 import com.example.floginsignup.model.ParkingState;
@@ -44,6 +52,29 @@ public class ParkingFragment extends Fragment {
     private final Handler gateHandler = new Handler(Looper.getMainLooper());
     private Runnable gateTick;
     private boolean gateBusy = false;
+
+    private final BluetoothGateManager gateBt = BluetoothGateManager.getInstance();
+
+    private final ActivityResultLauncher<String> btPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                if (granted) {
+                    onGateClicked();
+                } else {
+                    toast(getString(R.string.bt_permission_needed));
+                }
+            });
+
+    private final ActivityResultLauncher<Intent> devicePickerLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() != android.app.Activity.RESULT_OK || result.getData() == null) {
+                    return;
+                }
+                String name = result.getData().getStringExtra(SelectDeviceActivity.EXTRA_DEVICE_NAME);
+                String address = result.getData().getStringExtra(SelectDeviceActivity.EXTRA_DEVICE_ADDRESS);
+                if (address == null) return;
+                toast(getString(R.string.bt_connecting, name != null ? name : address));
+                gateBt.connect(name, address);
+            });
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -75,6 +106,40 @@ public class ParkingFragment extends Fragment {
         tvBtnGate = v.findViewById(R.id.tvBtnGate);
         btnGate.setOnClickListener(view -> onGateClicked());
 
+        gateBt.setListener(new BluetoothGateManager.Listener() {
+            @Override
+            public void onConnected(String deviceName) {
+                if (!isAdded()) return;
+                toast(getString(R.string.bt_connected, deviceName));
+                // Device picked from the gate button flow — send the command now
+                sendOpenGate();
+            }
+
+            @Override
+            public void onConnectionFailed(String reason) {
+                if (!isAdded()) return;
+                toast(getString(R.string.bt_connection_failed, reason));
+                resetGateButton();
+            }
+
+            @Override
+            public void onDisconnected() {
+                if (!isAdded()) return;
+                toast(getString(R.string.bt_disconnected));
+            }
+
+            @Override
+            public void onMessage(String message) {
+                if (!isAdded()) return;
+                // ESP32 confirms the real gate state — mirror it in the UI
+                if (message.equalsIgnoreCase("GATE:OPEN") || message.contains("G:1")) {
+                    applyGateState(true);
+                } else if (message.equalsIgnoreCase("GATE:CLOSED") || message.contains("G:0")) {
+                    applyGateState(false);
+                }
+            }
+        });
+
         ApiClient.get().getParkingState(new ApiCallback<ParkingState>() {
             @Override public void onSuccess(ParkingState data) { bind(data); }
             @Override public void onError(Throwable e) { /* show empty */ }
@@ -85,13 +150,37 @@ public class ParkingFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         gateHandler.removeCallbacksAndMessages(null);
+        gateBt.setListener(null);
     }
 
     private void onGateClicked() {
         // already opening, don't do it twice
         if (gateBusy) return;
+
+        // Need the Bluetooth runtime permission before anything else
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT)
+                != PackageManager.PERMISSION_GRANTED) {
+            btPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT);
+            return;
+        }
+
+        // Not connected to the gate controller yet — pick a paired device first;
+        // the command is sent from the onConnected callback
+        if (!gateBt.isConnected()) {
+            devicePickerLauncher.launch(new Intent(requireContext(), SelectDeviceActivity.class));
+            return;
+        }
+
+        sendOpenGate();
+    }
+
+    // Sends "O" to the ESP32 over Bluetooth and runs the usual open/countdown flow
+    private void sendOpenGate() {
+        if (gateBusy) return;
         gateBusy = true;
         btnGate.setEnabled(false);
+
+        gateBt.openGate();
 
         ApiClient.get().openGate(new ParkingApi.GateCallback() {
             @Override
@@ -105,6 +194,7 @@ public class ParkingFragment extends Fragment {
             public void onClosed() {
                 if (!isAdded()) return;
                 if (!gateBusy) return;
+                gateBt.closeGate();
                 applyGateState(false);
                 resetGateButton();
             }
@@ -270,6 +360,10 @@ public class ParkingFragment extends Fragment {
         lblLp.topMargin = dp(4);
         col.addView(label, lblLp);
         return col;
+    }
+
+    private void toast(String msg) {
+        Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
     }
 
     private int dp(int v) {
